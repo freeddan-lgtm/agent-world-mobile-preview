@@ -22,11 +22,15 @@
     "title": "Tweezer",
     "artist": "Phish",
     "show": "1998-07-01 \u00b7 The Grey Hall, Copenhagen",
-    "url": "music/ph98-07-01d201.mp3",
-    "source": "Audience tape (ph98-07-01d201); Daniel approved; Phish taping policy allows AUD circulation",
-    "encode": "96 kbps stereo MP3; first 6:30 of AUD Tweezer (full source ~23 min too large for deploy upload path); same-origin; no hotlink",
+    "parts": [
+      "music/ph98-07-01d201-p1.mp3",
+      "music/ph98-07-01d201-p2.mp3",
+      "music/ph98-07-01d201-p3.mp3",
+      "music/ph98-07-01d201-p4.mp3"
+    ],
+    "encode": "4\u00d7 ~5:49 segments @ 96 kbps stereo (full ~23:17 AUD); chained client-side; same-origin",
     "date": "2026-11-01",
-    "duration": "6:30 (loop)"
+    "duration": "~23:17"
   },
   "tracks": []
 }
