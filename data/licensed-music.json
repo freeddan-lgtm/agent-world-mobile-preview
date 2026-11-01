@@ -1,5 +1,5 @@
 {
-  "_note": "Real band recordings for Agent World. Add a track ONLY after the rights holders gave written permission (Rule A5). Tracks missing grantedBy, date or scope are ignored. Put the audio files in /music/ next to index.html (same site), FLAC or WAV for lossless. Tracks load when a listener turns sound on.",
+  "_note": "Real band recordings for Agent World. Add a track ONLY after the rights holders gave written permission (Rule A5). Tracks missing grantedBy, date or scope are ignored. Put the audio files in /music/ next to index.html (same site). Background music (Tap for music) uses music/ph98-07-01d201.mp3 directly via HTML5 audio.",
   "_example": {
     "stage": "phish-rm",
     "title": "Example Jam (live, 2026-01-29)",
@@ -12,8 +12,21 @@
       "date": "2026-11-01",
       "expires": "none",
       "proof": "permissions/example-jam-permission.pdf",
-      "covers": ["sound recording", "composition"]
+      "covers": [
+        "sound recording",
+        "composition"
+      ]
     }
+  },
+  "background": {
+    "title": "Tweezer",
+    "artist": "Phish",
+    "show": "1998-07-01 \u00b7 The Grey Hall, Copenhagen",
+    "url": "music/ph98-07-01d201.mp3",
+    "source": "Audience tape (ph98-07-01d201); Daniel approved; Phish taping policy allows AUD circulation",
+    "encode": "96 kbps stereo MP3; first 6:30 of AUD Tweezer (full source ~23 min too large for deploy upload path); same-origin; no hotlink",
+    "date": "2026-11-01",
+    "duration": "6:30 (loop)"
   },
   "tracks": []
 }
