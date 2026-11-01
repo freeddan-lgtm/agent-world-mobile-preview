@@ -1,6 +1,6 @@
 // Agent World · Claude Edition (v2.0, Keystone build) — ui.js
 // HUD: activity feed, toasts, XP and badges, panels, sheets, confetti.
-export const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&', '<': '<', '>': '>', '"': '"' })[c]);
+export const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const $ = s => document.querySelector(s);
 const LS = 'aw-cc.v1';
 export const BADGES = [
@@ -58,9 +58,12 @@ export class UI {
   closeSheet() { $('#sheet').hidden = true; }
 
   audioState(a) {
-    $('#a-on').textContent = a.on ? '🔇 Turn off band sound' : '🔊 Turn on band sound';
-    $('#a-on').setAttribute('aria-pressed', a.on);
-    if (!a.on) $('#a-now').textContent = 'Sound is off. Fly to a stage and turn it on.';
+    // Background music UI owns #a-on / #a-now; synth state is reflected only when music UI is absent.
+    if (!$('#bg-music')) {
+      $('#a-on').textContent = a.on ? '🔇 Turn off band sound' : '🔊 Turn on band sound';
+      $('#a-on').setAttribute('aria-pressed', a.on);
+      if (!a.on) $('#a-now').textContent = 'Sound is off. Fly to a stage and turn it on.';
+    }
   }
 
   confetti() {

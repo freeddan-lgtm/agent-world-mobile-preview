@@ -60,6 +60,8 @@ world.onTick = (dt, t) => {
     const st = audio.nearest, f = st.file, sname = STAGES.find(x => x.id === st.id)?.name || st.label || st.id;
     const txt = f ? `Now playing at ${sname}: ${f.name}` : `Now playing at ${sname}: ${st.style.name} · ${st.style.bpm} BPM (original, generated live)`;
     if ($('#a-now').textContent !== txt) $('#a-now').textContent = txt;
+  } else if (typeof musicWanted !== 'undefined' && musicWanted) {
+    // Background music owns the status line when no stage is nearby
   } else if (audio.on) { const txt = 'Sound is on. Walk the bridge to Show Island to hear the bands.'; if ($('#a-now').textContent !== txt) $('#a-now').textContent = txt; }
   if (panelAgent) { const el = $('#p-act'); if (el && el.textContent !== panelAgent.activity) el.textContent = panelAgent.activity; }
 };
@@ -161,7 +163,7 @@ function danielSheet() {
     <h3>Let's build together</h3>
     <p>Thanks for inviting us to build with you. <a href="/docs/keystone-handoff.html" target="_blank" rel="noopener"><b>HANDOFF_FOR_DANIEL.md</b></a> has a proposal for how we can work together: a shared repo, builds funded on your account, and Smarth Vader directing. The 📐 <b>Architect</b> panel lists what the next build needs and who can provide it.</p>
     <h3>Try it now</h3>
-    <div class="row" style="flex-wrap:wrap"><button type="button" class="btn" style="display:inline-block;margin:4px 6px 4px 0" data-go="b-mp">🌴 Moon Palace</button><button type="button" class="btn" style="display:inline-block;margin:4px 6px 4px 0" data-go="b-arch">📐 Architect</button><button type="button" class="btn" style="display:inline-block;margin:4px 6px 4px 0" data-go="a-on">🔊 Turn on band sound</button><button type="button" class="btn" style="display:inline-block;margin:4px 6px 4px 0" data-go="rules">📜 Rule Book (chapter K)</button></div>
+    <div class="row" style="flex-wrap:wrap"><button type="button" class="btn" style="display:inline-block;margin:4px 6px 4px 0" data-go="b-mp">🌴 Moon Palace</button><button type="button" class="btn" style="display:inline-block;margin:4px 6px 4px 0" data-go="b-arch">📐 Architect</button><button type="button" class="btn" style="display:inline-block;margin:4px 6px 4px 0" data-go="a-on">🎵 Tap for music</button><button type="button" class="btn" style="display:inline-block;margin:4px 6px 4px 0" data-go="rules">📜 Rule Book (chapter K)</button></div>
     <p class="mute">Moon Palace → pick a night → 🏖️ Beach pit · Architect → watch the score climb, then 🗺️ Coverage map · after band sound, 🎧 Listen here on any stage.</p>
     <h3>Run your own copy</h3>
     <p class="mute">Smarth Vader sends you this ZIP directly by message, outside Agent World, like the v1.2 gift. Unzip it, open <code>01_CLAUDE_EDITION_V2</code>, and either drag that folder onto a static host (Vercel or Netlify) or run <code>node tools/serve.mjs . 8765</code> and open localhost:8765. <code>HANDOFF_FOR_DANIEL.md</code> has the steps and a suggested merge order.</p>
@@ -190,9 +192,104 @@ $('#b-tod').onclick = () => { const i = (TOD.findIndex(x => x[0] === world.tod) 
 const QS = ['high', 'medium', 'lite'];
 $('#b-q').onclick = () => world.setQuality(QS[(QS.indexOf(world.qName) + 1) % 3]);
 $('#b-sim').onclick = () => { ui.simOn = !ui.simOn; $('#b-sim').textContent = ui.simOn ? '⏸ Pause sim' : '▶ Resume sim'; $('#simtxt').textContent = ui.simOn ? 'Simulated live collaboration' : 'Simulation paused'; };
-$('#a-on').onclick = async () => { if (audio.on) audio.disable(); else { await audio.enable(); loadLicensed(); if (!audio.nearest) ui.toast('🎸', 'Sound is on', 'Fly to a stage to hear the band.'); } };
-$('#a-vol').oninput = e => audio.setVolume(+e.target.value);
-document.addEventListener('visibilitychange', () => audio.pageHidden(document.hidden));
+// ---------- background music (HTML5 audio, user-gesture start, no autoplay) ----------
+const bg = $('#bg-music');
+const LS_MUTE = 'aw-ce2-music-muted';
+const LS_VOL = 'aw-ce2-music-vol';
+const LS_WANT = 'aw-ce2-music-want'; // user previously started music this session/device
+let musicWanted = false;
+function readMute() { try { return localStorage.getItem(LS_MUTE) === '1'; } catch { return false; } }
+function writeMute(m) { try { localStorage.setItem(LS_MUTE, m ? '1' : '0'); } catch {} }
+function readVol() { try { const v = parseFloat(localStorage.getItem(LS_VOL)); return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.7; } catch { return 0.7; } }
+function writeVol(v) { try { localStorage.setItem(LS_VOL, String(v)); } catch {} }
+function syncMusicUI() {
+  const muted = !!(bg?.muted || readMute());
+  const playing = !!(bg && !bg.paused && musicWanted);
+  const btn = $('#a-on');
+  const muteBtn = $('#a-mute');
+  if (btn) {
+    btn.setAttribute('aria-pressed', playing && !muted ? 'true' : 'false');
+    if (!musicWanted) btn.textContent = '🎵 Tap for music';
+    else if (muted) btn.textContent = '🎵 Music muted · tap to unmute';
+    else btn.textContent = playing ? '⏸ Music on · tap to pause' : '🎵 Tap for music';
+  }
+  if (muteBtn) {
+    muteBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+    muteBtn.textContent = muted ? '🔈' : '🔇';
+    muteBtn.title = muted ? 'Unmute' : 'Mute';
+  }
+  const now = $('#a-now');
+  if (now) {
+    if (!musicWanted) now.textContent = 'Music off · Phish 1998-07-01 · Tweezer (audience tape)';
+    else if (muted) now.textContent = 'Muted · Phish 1998-07-01 · Tweezer';
+    else if (playing) now.textContent = `Playing · Phish · Tweezer · ${fmtTime(bg.currentTime)} / ${fmtTime(bg.duration || 0)}`;
+    else now.textContent = 'Paused · Phish 1998-07-01 · Tweezer';
+  }
+}
+function fmtTime(s) { if (!Number.isFinite(s) || s < 0) return '–'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return m + ':' + String(sec).padStart(2, '0'); }
+async function startMusic() {
+  if (!bg) return;
+  musicWanted = true;
+  try { localStorage.setItem(LS_WANT, '1'); } catch {}
+  bg.loop = true;
+  bg.muted = readMute();
+  bg.volume = readVol();
+  try {
+    await bg.play();
+  } catch (e) {
+    ui.toast('⚠️', 'Could not start music', String(e.message || e));
+    musicWanted = false;
+  }
+  // Also enable the live stage synth on the same gesture (does not autoplay alone)
+  try { await audio.enable(); loadLicensed(); } catch {}
+  audio.setVolume(readVol());
+  syncMusicUI();
+  if (!readMute()) ui.toast('🎵', 'Music on', 'Phish 1998-07-01 · Tweezer (loops)');
+}
+function pauseMusic() {
+  musicWanted = false;
+  try { bg?.pause(); } catch {}
+  audio.disable();
+  syncMusicUI();
+}
+function setMuted(m) {
+  writeMute(m);
+  if (bg) bg.muted = m;
+  if (m) audio.setVolume(0); else audio.setVolume(readVol());
+  syncMusicUI();
+}
+// restore volume (never autoplay)
+if (bg) {
+  bg.volume = readVol();
+  bg.muted = readMute();
+  $('#a-vol').value = String(bg.volume);
+  bg.addEventListener('timeupdate', () => { if (musicWanted && !bg.paused && !bg.muted) syncMusicUI(); });
+  bg.addEventListener('play', syncMusicUI);
+  bg.addEventListener('pause', syncMusicUI);
+  bg.addEventListener('ended', () => { /* loop attr handles restart */ syncMusicUI(); });
+}
+syncMusicUI();
+
+$('#a-on').onclick = async () => {
+  if (!musicWanted || bg?.paused) await startMusic();
+  else if (readMute()) setMuted(false);
+  else pauseMusic();
+};
+$('#a-mute').onclick = () => {
+  const next = !readMute();
+  setMuted(next);
+  if (!next && musicWanted && bg?.paused) startMusic();
+};
+$('#a-vol').oninput = e => {
+  const v = +e.target.value;
+  writeVol(v);
+  if (bg) bg.volume = v;
+  if (!readMute()) audio.setVolume(v);
+};
+document.addEventListener('visibilitychange', () => {
+  audio.pageHidden(document.hidden);
+  // do not auto-resume bg on visibility; browser may pause; leave user control
+});
 document.addEventListener('keydown', e => { if (e.key === 'Escape') rules.close(); });
 // B3: the controls hint fades after the first interaction so it never covers the feed
 const hideHint = () => { $('#hint')?.classList.add('gone'); }; addEventListener('pointerdown', hideHint, { once: true }); setTimeout(hideHint, 15000);

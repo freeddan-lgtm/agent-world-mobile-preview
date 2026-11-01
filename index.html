@@ -194,6 +194,14 @@ html,body{overflow-x:hidden;max-width:100vw}
   #a-vol{min-height:44px}
 }
 
+
+#a-mute{flex:none;min-width:44px;padding:8px 10px}
+#audiobox .arow{flex-wrap:wrap}
+#a-on{flex:1 1 auto;min-width:0}
+@media (max-width: 760px),(pointer:coarse){
+  #a-mute{min-height:44px}
+  #audiobox .arow{gap:8px}
+}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -228,13 +236,15 @@ html,body{overflow-x:hidden;max-width:100vw}
   <ul id="feed" aria-live="polite"></ul>
 </section>
 
-<section id="audiobox" class="glass" aria-label="Live band audio">
+<section id="audiobox" class="glass" aria-label="Background music">
+  <audio id="bg-music" src="music/ph98-07-01d201.mp3" preload="metadata" loop playsinline></audio>
   <div class="arow">
-    <button type="button" class="btn" id="a-on" aria-pressed="false">🔊 Turn on band sound</button>
-    <label class="sr" for="a-vol">Volume</label><input type="range" id="a-vol" min="0" max="1" step="0.01" value="0.8">
+    <button type="button" class="btn" id="a-on" aria-pressed="false">🎵 Tap for music</button>
+    <button type="button" class="btn ghost" id="a-mute" aria-pressed="false" title="Mute">🔇</button>
+    <label class="sr" for="a-vol">Volume</label><input type="range" id="a-vol" min="0" max="1" step="0.01" value="0.7" aria-label="Music volume">
   </div>
-  <p id="a-now" class="mute">Sound is off. Fly to a stage and turn it on.</p>
-  <p class="fine">Original live-generated music · 32-bit float · 48 kHz · no lossy codec</p>
+  <p id="a-now" class="mute">Music off · Phish 1998-07-01 · Tweezer (audience tape)</p>
+  <p class="fine">Tap to start · loops · mute remembered · same-origin · no autoplay</p>
 </section>
 
 <aside id="panel" class="glass" hidden aria-live="polite"></aside>
@@ -262,7 +272,7 @@ html,body{overflow-x:hidden;max-width:100vw}
   // Agent World config. bridge: 'wss://…' for a live agent feed. packs: expansion packs to load.
   // opt: render optimizations kept by the Keystone build loop (data/build_ledger.json); ?opt=none turns them off.
   // dialogProvider: optional async function that proposes dialog lines (every line is validated; see src/dialog.js).
-  window.AW_CONFIG = { bridge: 'https://ce2-h7w3n9x5kq2m.vercel.app/api/world', opt: ['batch', 'casters'], dialogProvider: null, packs: [
+  window.AW_CONFIG = { bridge: new URL('/api/world', location.href).href, opt: ['batch', 'casters'], dialogProvider: null, packs: [
     { adapter: 'packs/festival-grounds/cc-edition-adapter.js', base: 'packs/festival-grounds/' },
     { adapter: 'packs/hollywood-bowl/cc-edition-adapter.js', base: 'packs/hollywood-bowl/' },
     { adapter: 'packs/moon-palace-cancun/cc-edition-adapter.js', base: 'packs/moon-palace-cancun/' },
