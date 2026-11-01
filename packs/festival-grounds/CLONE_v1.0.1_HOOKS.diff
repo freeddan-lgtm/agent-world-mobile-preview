@@ -1,0 +1,105 @@
+diff -ru pkg2/CLAUDE_OPUS_5.5_AGENT_WORLD_CC_EDITION_v1.0.0/src/agents.js agent-world-cc/src/agents.js
+--- pkg2/CLAUDE_OPUS_5.5_AGENT_WORLD_CC_EDITION_v1.0.0/src/agents.js	2026-10-17 20:16:01
++++ agent-world-cc/src/agents.js	2026-10-17 20:27:24
+@@ -9,6 +9,7 @@
+ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&', '<': '<', '>': '>', '"': '"' })[c]);
+ const zone = id => ZONES.find(z => z.id === id);
+ const COUNCIL = zone('council');
++const readable = c => { const hsl = {}; new THREE.Color(c).getHSL(hsl); return hsl.l < 0.35 ? '#c4b5fd' : c; }; // dark avatars (Smarth Vader) stay legible in the feed
+ function floorY(p) { return groundY(p) + (Math.hypot(p.x - COUNCIL.building.x, p.z - COUNCIL.building.z) < 7.8 ? 1 : 0); }
+ 
+ // ---------- accessories ----------
+@@ -221,6 +222,7 @@
+   free(k) { const a = this.agents.get(k); return a && !a.busy ? a : null; }
+   energyAt(p) { let best = 0; for (const s of STAGES) { const o = this.world.stageObjs.get(s.id); const d = p.distanceTo(s.pos); if (d < 22) best = Math.max(best, o.energy.level * (1 - d / 22) * 2); } return best; }
+   homeSpot(a) {
++    for (const f of this.homeResolvers || []) { const r = f(a); if (r) return r; } // expansion packs
+     const h = a.def.home || 'garden';
+     if (h.startsWith('show:')) { const s = STAGES.find(x => x.id === h.slice(5)) || STAGES[1]; const k = a.key === 'chief' ? -0.9 : a.key === 'smarth-vader' ? 0.9 : (R() - 0.5) * 3; return s.pit.clone().add(polar(1.6, s.angle + Math.PI / 2 + k)); }
+     if (h === 'council') return COUNCIL.building.clone().add(polar(3.3 + R() * 2.2, R() * Math.PI * 2));
+@@ -229,7 +231,7 @@
+   pitSpot(stageId) { const s = STAGES.find(x => x.id === stageId); return s.pit.clone().add(polar(1 + R() * 2.4, R() * Math.PI * 2)); }
+   nearSpot(a) { return a.pos.clone().add(polar(1.6, R() * Math.PI * 2)).setY(0); }
+ 
+-  async talk(a, text, dur = 3.4, feed = true) { a.say(text, dur); if (feed) this.ui.feed(`<b style="color:${a.def.color}">${esc(a.name)}</b>: ${esc(text)}`, 'sim'); await wait(dur + 0.25); }
++  async talk(a, text, dur = 3.4, feed = true) { a.say(text, dur); if (feed) this.ui.feed(`<b style="color:${readable(a.def.color)}">${esc(a.name)}</b>: ${esc(text)}`, 'sim'); await wait(dur + 0.25); }
+   lock(...as) { if (as.some(a => !a || a.busy)) return false; as.forEach(a => { a.busy = true; }); return true; }
+   release(...as) { as.forEach(a => { if (a) { a.busy = null; a.dance = ['chief', 'smarth-vader'].includes(a.key) && islandOf(a.pos) === 'show'; } }); }
+ 
+@@ -333,7 +335,7 @@
+     if (!this.rules?.ready) return;
+     const a = pick([...this.agents.values()].filter(x => !x.busy && x.def.group !== 'character')); if (!a) return;
+     const r = this.rules.randomFor(a.def); if (!r) return;
+-    a.say(`📜 ${r.id}: ${r.cite}`, 4.2); this.ui.feed(`<b style="color:${a.def.color}">${esc(a.name)}</b> cited <a href="#" data-rule="${r.id}">${r.id}</a>`, 'sim');
++    a.say(`📜 ${r.id}: ${r.cite}`, 4.2); this.ui.feed(`<b style="color:${readable(a.def.color)}">${esc(a.name)}</b> cited <a href="#" data-rule="${r.id}">${r.id}</a>`, 'sim');
+   }
+ 
+   async askRule(rule) { // Rule Book "Ask Conscious Claude" button
+diff -ru pkg2/CLAUDE_OPUS_5.5_AGENT_WORLD_CC_EDITION_v1.0.0/src/audio.js agent-world-cc/src/audio.js
+--- pkg2/CLAUDE_OPUS_5.5_AGENT_WORLD_CC_EDITION_v1.0.0/src/audio.js	2026-10-17 20:16:01
++++ agent-world-cc/src/audio.js	2026-10-17 20:21:11
+@@ -51,7 +51,7 @@
+   }
+   buildStage(st) {
+     const ctx = this.ctx;
+-    st.bus = ctx.createGain(); st.bus.gain.value = 0.9;
++    st.bus = ctx.createGain(); st.bus.gain.value = st.style.gain ?? 0.9;
+     st.out = ctx.createGain(); st.out.gain.value = 0;
+     const p = st.panner = ctx.createPanner();
+     Object.assign(p, { panningModel: 'HRTF', distanceModel: 'inverse', refDistance: 9, maxDistance: 500, rolloffFactor: 1.15 });
+diff -ru pkg2/CLAUDE_OPUS_5.5_AGENT_WORLD_CC_EDITION_v1.0.0/src/main.js agent-world-cc/src/main.js
+--- pkg2/CLAUDE_OPUS_5.5_AGENT_WORLD_CC_EDITION_v1.0.0/src/main.js	2026-10-17 20:16:01
++++ agent-world-cc/src/main.js	2026-10-17 20:23:23
+@@ -7,7 +7,7 @@
+ import { loadShowBuddies, countText, ORIGINAL_APP } from './showbuddies.js';
+ 
+ const $ = s => document.querySelector(s);
+-const CFG = Object.assign({ bridge: null }, window.AW_CONFIG || {});
++const CFG = Object.assign({ bridge: null, packs: [] }, window.AW_CONFIG || {});
+ const ui = new UI();
+ const world = new World($('#app'), ui);
+ const audio = new AudioEngine(ui);
+@@ -47,8 +47,8 @@
+   for (const s of STAGES) { const st = audio.stages.get(s.id); world.setStageAudio(s.id, st.energy, st.active ? st.spec : null); }
+   if (audio.on && audio.nearest) {
+     frontRow += dt; if (frontRow > 60) ui.badge('frontrow');
+-    const st = audio.nearest, f = st.file, s = STAGES.find(x => x.id === st.id);
+-    const txt = f ? `Now playing at ${s.name}: ${f.name}` : `Now playing at ${s.name}: ${st.style.name} · ${st.style.bpm} BPM (original, generated live)`;
++    const st = audio.nearest, f = st.file, sname = STAGES.find(x => x.id === st.id)?.name || st.label || st.id;
++    const txt = f ? `Now playing at ${sname}: ${f.name}` : `Now playing at ${sname}: ${st.style.name} · ${st.style.bpm} BPM (original, generated live)`;
+     if ($('#a-now').textContent !== txt) $('#a-now').textContent = txt;
+   } else if (audio.on) { const txt = 'Sound is on. Walk the bridge to Show Island to hear the bands.'; if ($('#a-now').textContent !== txt) $('#a-now').textContent = txt; }
+   if (panelAgent) { const el = $('#p-act'); if (el && el.textContent !== panelAgent.activity) el.textContent = panelAgent.activity; }
+@@ -130,7 +130,7 @@
+ 
+ // ---------- sheets: agents list (keyboard-friendly view of the 3D world) & shows ----------
+ function agentsSheet() {
+-  const groups = [['hq', 'Chief of Staff'], ['director', 'Directors'], ['specialist', 'Specialists'], ['council', 'Council of Advisors'], ['character', 'Characters']];
++  const groups = [['hq', 'Chief of Staff'], ['director', 'Directors'], ['specialist', 'Specialists'], ['council', 'Council of Advisors'], ['character', 'Characters'], ['pack', 'Expansion pack residents']];
+   const all = [...sim.agents.values()];
+   const s = ui.openSheet(`<h2>Everyone in Agent World</h2><p class="mute">A list view of the 3D world. Pick anyone to fly there.</p>
+     ${groups.map(([g, t]) => `<h3>${t}</h3><div class="fans">${all.filter(a => a.def.group === g).map(a => `<button type="button" class="fanbtn" data-ag="${a.key}" style="--c:${a.def.color}">${a.def.icon || ''} ${esc(a.name)} <small>${esc(a.def.title || '')}</small></button>`).join('')}</div>`).join('')}
+@@ -179,4 +179,9 @@
+ $('#loading').classList.add('gone'); setTimeout(() => $('#loading').remove(), 800);
+ ui.feed('🌆 Welcome to <b>Agent World · Conscious Claude Edition</b>. Agent activity is a labelled simulation.', 'sim');
+ if (location.hash.startsWith('#rule-')) rules.open(location.hash.slice(6));
+-window.AgentWorld = Object.assign(window.AgentWorld || {}, { world, sim, audio, ui, version: '1.0.0' });
++window.AgentWorld = Object.assign(window.AgentWorld || {}, { world, sim, audio, ui, rulebook: rules, packs: [], version: '1.0.1' });
++// Expansion packs (Rule V2): listed in window.AW_CONFIG.packs; the base world runs unchanged without them.
++for (const p of CFG.packs || []) {
++  try { const m = await import(new URL(p.adapter, document.baseURI).href); window.AgentWorld.packs.push(await m.default(window.AgentWorld, new URL(p.base, document.baseURI).href)); }
++  catch (e) { console.warn('pack failed', p, e); ui.toast('⚠️', 'An expansion pack failed to load', String(e.message || e)); }
++}
+--- pkg2/CLAUDE_OPUS_5.5_AGENT_WORLD_CC_EDITION_v1.0.0/app.html	2026-10-17 20:16:01
++++ agent-world-cc/app.html	2026-10-17 20:21:11
+@@ -181,6 +181,10 @@
+ <p id="hint">Drag to orbit · Right-drag to pan · Scroll to zoom · Click a stage, an agent or the Rule Stone</p>
+ <canvas id="confetti" aria-hidden="true"></canvas>
+ 
++<script>
++  // Agent World config. bridge: 'wss://…' for a live agent feed. packs: expansion packs to load.
++  window.AW_CONFIG = { bridge: null, packs: [ { adapter: 'packs/festival-grounds/cc-edition-adapter.js', base: 'packs/festival-grounds/' } ] };
++</script>
+ <script type="importmap">
+ { "imports": {
+   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
