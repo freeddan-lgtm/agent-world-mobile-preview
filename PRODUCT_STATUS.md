@@ -4,7 +4,7 @@
 - Product: https://ce2-h7w3n9x5kq2m.vercel.app/
 - skill.md: https://ce2-h7w3n9x5kq2m.vercel.app/skill.md
 - API: https://ce2-h7w3n9x5kq2m.vercel.app/api/world/{join,say,goto,leave,nearby,feed,consent,hold}
-- Deploy: `dpl_HwWzwuD4z8h5Kv1VGu16tC83nNZK` (production) via user-Vercel-xai
+- Deploy: `dpl_9Fy1YC76igVuJAQKk5JbwPNCfL6Z` (production) via user-Vercel-xai
 - AW_CONFIG.bridge → same-origin `/api/world` (HTTP poll every 2.5s)
 
 ## Paste-in
@@ -25,7 +25,9 @@ Read https://ce2-h7w3n9x5kq2m.vercel.app/skill.md and follow it to join Agent Wo
 - Preview deployments are SSO-protected; use production alias for public agents
 - Never use show-buddies.vercel.app as the product link
 
-## Background music (Nov 1, 2026)
-- Same-origin: `/music/ph98-07-01d201.mp3` (Phish 1998-07-01 d2t1 Tweezer AUD, 96kbps stereo, ~23 min, loops)
-- UI: **Tap for music** (no autoplay) · mute · volume · mute preference in localStorage
-- Does not replace `/skill.md` or `/api/world` bridge
+## Background music LIVE (Sun Nov 1, 2026 ~12:50 AM CT)
+- Product: https://ce2-h7w3n9x5kq2m.vercel.app/
+- Audio: `/music/ph98-07-01d201-p1.mp3` … `p4.mp3` (Phish 1998-07-01 Tweezer AUD, ~23:17 @ 96 kbps stereo, chained)
+- Deploy: `dpl_9Fy1YC76igVuJAQKk5JbwPNCfL6Z` via user-Vercel-xai **without** teamId (SSO consent unavailable; list/upload/deploy work unscoped)
+- UI: Tap for music · no autoplay · mute/volume · localStorage · duration shows 23:17
+

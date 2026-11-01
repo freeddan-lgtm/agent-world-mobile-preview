@@ -220,31 +220,63 @@ function syncMusicUI() {
   }
   const now = $('#a-now');
   if (now) {
-    if (!musicWanted) now.textContent = 'Music off · Phish 1998-07-01 · Tweezer (audience tape)';
+    if (!musicWanted) now.textContent = 'Music off · Phish 1998-07-01 · Tweezer (~23 min audience tape)';
     else if (muted) now.textContent = 'Muted · Phish 1998-07-01 · Tweezer';
-    else if (playing) now.textContent = `Playing · Phish · Tweezer · ${fmtTime(bg.currentTime)} / ${fmtTime(bg.duration || 0)}`;
+    else if (playing) {
+      const list = (typeof musicSrcList === 'function' ? musicSrcList() : []);
+      const partOff = (list.length > 1 ? musicPart * (musicDurTotal / list.length) : 0);
+      const t = partOff + (bg.currentTime || 0);
+      const dur = list.length > 1 ? musicDurTotal : (bg.duration || musicDurTotal);
+      now.textContent = `Playing · Phish · Tweezer · ${fmtTime(t)} / ${fmtTime(dur)}`;
+    }
     else now.textContent = 'Paused · Phish 1998-07-01 · Tweezer';
   }
 }
 function fmtTime(s) { if (!Number.isFinite(s) || s < 0) return '–'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return m + ':' + String(sec).padStart(2, '0'); }
+// Full Tweezer (~23 min) as same-origin parts (96k) chained; single-file URL also supported.
+const MUSIC_PARTS = [
+  'music/ph98-07-01d201-p1.mp3',
+  'music/ph98-07-01d201-p2.mp3',
+  'music/ph98-07-01d201-p3.mp3',
+  'music/ph98-07-01d201-p4.mp3',
+];
+const MUSIC_FALLBACK = 'music/ph98-07-01d201.mp3'; // shorter/single if parts missing
+const MUSIC_EXTERNAL = null; // set to https URL on a host we control if same-origin parts unavailable
+let musicPart = 0;
+let musicDurTotal = 23 * 60 + 17; // ~23:17 audience tape
+function musicSrcList() {
+  if (MUSIC_EXTERNAL) return [MUSIC_EXTERNAL];
+  return MUSIC_PARTS;
+}
+function loadMusicPart(i) {
+  const list = musicSrcList();
+  musicPart = ((i % list.length) + list.length) % list.length;
+  const url = list[musicPart];
+  if (bg && bg.getAttribute('src') !== url) { bg.src = url; bg.load(); }
+}
 async function startMusic() {
   if (!bg) return;
   musicWanted = true;
   try { localStorage.setItem(LS_WANT, '1'); } catch {}
-  bg.loop = true;
+  bg.loop = musicSrcList().length === 1; // multi-part: advance on ended
   bg.muted = readMute();
   bg.volume = readVol();
+  loadMusicPart(musicPart || 0);
   try {
     await bg.play();
   } catch (e) {
-    ui.toast('⚠️', 'Could not start music', String(e.message || e));
-    musicWanted = false;
+    // try single-file fallback
+    try {
+      bg.src = MUSIC_FALLBACK; bg.loop = true; bg.load(); await bg.play();
+    } catch (e2) {
+      ui.toast('⚠️', 'Could not start music', String(e2.message || e2));
+      musicWanted = false;
+    }
   }
-  // Also enable the live stage synth on the same gesture (does not autoplay alone)
   try { await audio.enable(); loadLicensed(); } catch {}
   audio.setVolume(readVol());
   syncMusicUI();
-  if (!readMute()) ui.toast('🎵', 'Music on', 'Phish 1998-07-01 · Tweezer (loops)');
+  if (!readMute() && musicWanted) ui.toast('🎵', 'Music on', 'Phish 1998-07-01 · Tweezer (~23 min, loops)');
 }
 function pauseMusic() {
   musicWanted = false;
@@ -266,7 +298,14 @@ if (bg) {
   bg.addEventListener('timeupdate', () => { if (musicWanted && !bg.paused && !bg.muted) syncMusicUI(); });
   bg.addEventListener('play', syncMusicUI);
   bg.addEventListener('pause', syncMusicUI);
-  bg.addEventListener('ended', () => { /* loop attr handles restart */ syncMusicUI(); });
+  bg.addEventListener('ended', async () => {
+    const list = musicSrcList();
+    if (!musicWanted) return syncMusicUI();
+    if (list.length <= 1) { syncMusicUI(); return; }
+    loadMusicPart(musicPart + 1);
+    try { await bg.play(); } catch (e) { console.warn('music part advance', e); }
+    syncMusicUI();
+  });
 }
 syncMusicUI();
 
