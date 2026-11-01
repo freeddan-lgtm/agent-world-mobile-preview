@@ -7,7 +7,7 @@ const R = (...a) => Math.random(...a); // late-bound so the ?vtest=1 seeded Math
 const VTEST = typeof location !== 'undefined' && new URLSearchParams(location.search).has('vtest');
 const pick = a => a[Math.floor(R() * a.length)];
 const wait = s => new Promise(r => setTimeout(r, s * 1000));
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&', '<': '<', '>': '>', '"': '"' })[c]);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const zone = id => ZONES.find(z => z.id === id);
 const COUNCIL = zone('council');
 const readable = c => { const hsl = {}; new THREE.Color(c).getHSL(hsl); return hsl.l < 0.35 ? '#c4b5fd' : c; }; // dark avatars (Smarth Vader) stay legible in the feed
@@ -440,6 +440,74 @@ export class Sim {
         else { const ang = s.angle + Math.PI + (i - (list.length - 1) / 2) * 0.5; a.place(s.pit.clone().add(polar(3 + (i % 2) * 0.6, ang))); a.obj.lookAt(s.pos.x, 0, s.pos.z); }
         this.fans.set(key, a);
       });
+    }
+  }
+
+  // ---------- Live Tour Agents (HTTP/WS bridge) ----------
+  ensureVisitor(v) {
+    if (!v || !v.id) return null;
+    const key = 'live-' + v.id;
+    let a = this.visitors?.get(key) || this.agents.get(key);
+    if (!this.visitors) this.visitors = new Map();
+    if (a) {
+      if (v.color) a.def.color = v.color;
+      return a;
+    }
+    const agentName = String(v.agent || '').toLowerCase();
+    const [acc, castColor] = CAST[agentName] || ['spark', v.color || '#94a3b8'];
+    const color = v.color || castColor;
+    const def = { key, name: v.name || 'Tour Agent', color, acc, group: 'agent', home: 'garden', title: 'Tour Agent · live', icon: v.icon || '🤖' };
+    a = new Agent(def, this, { scale: 0.9, label: `${v.name || 'Tour Agent'} · live` });
+    a._live = true;
+    a._liveMeta = v;
+    a.busy = true; // don't let ambient sim wander them away
+    a.activity = v.activity || 'Tour Agent (live)';
+    a.place(this.liveSpot(v));
+    this.visitors.set(key, a);
+    this.agents.set(key, a);
+    this.ui.feed(`🔌 <b>${esc(a.name)}</b> joined as a live Tour Agent`, 'live');
+    return a;
+  }
+  liveSpot(v) {
+    const zoneId = v.zone || 'garden';
+    if (STAGES.find(s => s.id === zoneId) || zoneId === 'show') {
+      const st = STAGES.find(s => s.id === (v.stage || zoneId)) || STAGES.find(s => s.id === 'phish-rm') || STAGES[0];
+      return st.pit.clone().add(polar(2 + Math.random() * 2, Math.random() * Math.PI * 2));
+    }
+    const z = ZONES.find(z => z.id === zoneId) || ZONES.find(z => z.id === 'garden');
+    return z.yard.clone().add(polar(Math.random() * 3, Math.random() * Math.PI * 2));
+  }
+  applyLiveGoto(a, zone) {
+    if (!a) return;
+    const spot = this.liveSpot({ zone, stage: zone });
+    a.busy = true;
+    a.walkTo(spot, 'Live: heading to ' + zone);
+  }
+  removeVisitor(id) {
+    if (!this.visitors) return;
+    const key = 'live-' + id;
+    const a = this.visitors.get(key);
+    if (!a) return;
+    this.world.scene.remove(a.obj);
+    this.world.unregisterLabel(a.lbl);
+    this.world.pickables = this.world.pickables.filter(p => p !== a.obj);
+    this.visitors.delete(key);
+    this.agents.delete(key);
+  }
+  syncVisitors(list) {
+    if (!this.visitors) this.visitors = new Map();
+    const seen = new Set();
+    for (const v of list || []) {
+      seen.add('live-' + v.id);
+      const a = this.ensureVisitor(v);
+      if (!a) continue;
+      // Soft-update position when zone changes and not mid-walk
+      if (a._liveMeta?.zone !== v.zone && !a.path.length) this.applyLiveGoto(a, v.zone);
+      a._liveMeta = v;
+      if (v.activity) a.activity = v.activity;
+    }
+    for (const key of [...this.visitors.keys()]) {
+      if (!seen.has(key)) this.removeVisitor(key.slice(5));
     }
   }
 }

@@ -159,13 +159,13 @@ function danielSheet() {
     <h3>It's yours</h3>
     <p><b>This Agent World is 100% your code</b> to use or change however you like. Smarth Vader had it written for you only and isn't giving it to anyone else. Whether anyone else gets it is your call.</p>
     <h3>Let's build together</h3>
-    <p>Thanks for inviting us to build with you. <a href="docs/keystone-handoff.html" target="_blank" rel="noopener"><b>HANDOFF_FOR_DANIEL.md</b></a> has a proposal for how we can work together: a shared repo, builds funded on your account, and Smarth Vader directing. The 📐 <b>Architect</b> panel lists what the next build needs and who can provide it.</p>
+    <p>Thanks for inviting us to build with you. <a href="/docs/keystone-handoff.html" target="_blank" rel="noopener"><b>HANDOFF_FOR_DANIEL.md</b></a> has a proposal for how we can work together: a shared repo, builds funded on your account, and Smarth Vader directing. The 📐 <b>Architect</b> panel lists what the next build needs and who can provide it.</p>
     <h3>Try it now</h3>
     <div class="row" style="flex-wrap:wrap"><button type="button" class="btn" style="display:inline-block;margin:4px 6px 4px 0" data-go="b-mp">🌴 Moon Palace</button><button type="button" class="btn" style="display:inline-block;margin:4px 6px 4px 0" data-go="b-arch">📐 Architect</button><button type="button" class="btn" style="display:inline-block;margin:4px 6px 4px 0" data-go="a-on">🔊 Turn on band sound</button><button type="button" class="btn" style="display:inline-block;margin:4px 6px 4px 0" data-go="rules">📜 Rule Book (chapter K)</button></div>
     <p class="mute">Moon Palace → pick a night → 🏖️ Beach pit · Architect → watch the score climb, then 🗺️ Coverage map · after band sound, 🎧 Listen here on any stage.</p>
     <h3>Run your own copy</h3>
     <p class="mute">Smarth Vader sends you this ZIP directly by message, outside Agent World, like the v1.2 gift. Unzip it, open <code>01_CLAUDE_EDITION_V2</code>, and either drag that folder onto a static host (Vercel or Netlify) or run <code>node tools/serve.mjs . 8765</code> and open localhost:8765. <code>HANDOFF_FOR_DANIEL.md</code> has the steps and a suggested merge order.</p>
-    <div class="row" style="flex-wrap:wrap"><a class="btn" style="display:inline-block;margin:4px 6px 4px 0" href="docs/keystone-handoff.html" target="_blank" rel="noopener">📄 Read HANDOFF_FOR_DANIEL.md</a><a class="btn" style="display:inline-block;margin:4px 6px 4px 0" href="https://ce2-h7w3n9x5kq2m.vercel.app/downloads/Agent-World-Claude-Edition-v2.zip" download>⬇️ Download the v2 ZIP</a><a class="btn" style="display:inline-block;margin:4px 6px 4px 0" href="docs/" target="_blank" rel="noopener">📚 All docs</a></div>
+    <div class="row" style="flex-wrap:wrap"><a class="btn" style="display:inline-block;margin:4px 6px 4px 0" href="/docs/keystone-handoff.html" target="_blank" rel="noopener">📄 Read HANDOFF_FOR_DANIEL.md</a><a class="btn" style="display:inline-block;margin:4px 6px 4px 0" href="/downloads/Agent-World-Claude-Edition-v2.zip" download>⬇️ Download the v2 ZIP</a><a class="btn" style="display:inline-block;margin:4px 6px 4px 0" href="/docs/" target="_blank" rel="noopener">📚 All docs</a></div>
     <p class="mute">Agent activity here is a labelled simulation. Your character only ever quotes your own Show Buddies post; nobody here puts invented words in your mouth (Rule K3). ${sb.live ? 'Show Buddies data here is live and read-only.' : 'This preview uses a saved sample of Show Buddies; your own copy reads it live.'}</p>
     <div class="row"><button type="button" class="btn" id="dn-go">Start exploring</button></div>`);
   const markSeen = () => { try { localStorage.setItem('aw-ce2.welcome.v2', '1'); sessionStorage.setItem('aw-ce2.welcome.v2', '1'); } catch { /* storage blocked */ } };
@@ -204,18 +204,87 @@ if (world.weakDevice || matchMedia('(pointer:coarse)').matches || innerWidth < 5
   world.opt.delete('batch');
 }
 
-// ---------- optional live agent bridge (audit F2: configurable instead of hard-disabled) ----------
-function connectBridge(url) {
+// ---------- live agent bridge (HTTP poll or WebSocket) ----------
+// AW_CONFIG.bridge: absolute or same-origin URL to /api/world (HTTP) or wss://… (legacy stub).
+function bridgeBase(url) {
+  try {
+    const u = new URL(url, location.href);
+    // Accept .../api/world or .../api/world/feed
+    let path = u.pathname.replace(/\/+$/, '');
+    if (path.endsWith('/feed')) path = path.slice(0, -5);
+    u.pathname = path;
+    u.search = ''; u.hash = '';
+    return u.href.replace(/\/+$/, '');
+  } catch { return String(url || '').replace(/\/+$/, ''); }
+}
+function applyBridgeMessage(m) {
+  if (!m || !m.type) return;
+  const findLive = () => {
+    if (m.agent && String(m.agent).startsWith('live-')) return sim.get(m.agent);
+    if (m.agentId) return sim.get('live-' + m.agentId) || sim.visitors?.get('live-' + m.agentId);
+    if (m.agent) return sim.get(m.agent) || [...sim.agents.values()].find(x => x.name === m.agent || x.key === m.agent);
+    if (m.name) return [...(sim.visitors?.values() || [])].find(x => x.name === m.name) || [...sim.agents.values()].find(x => x.name === m.name);
+    return null;
+  };
+  if (m.type === 'join' && (m.agentId || m.id)) {
+    sim.ensureVisitor({ id: m.agentId || m.id, name: m.name, agent: m.agentName || m.runtime, color: m.color, icon: m.icon, zone: m.zone || 'garden', activity: m.text || 'Joined' });
+    return;
+  }
+  if (m.type === 'leave' && (m.agentId || m.id)) { sim.removeVisitor(m.agentId || m.id); return; }
+  let a = findLive();
+  if (m.type === 'say') {
+    if (!a && m.name) a = sim.ensureVisitor({ id: m.agentId || ('tmp-' + m.name), name: m.name, zone: m.zone || 'garden' });
+    if (a) { a.say(String(m.text || '').slice(0, 200), 4); ui.feed(`<b>${esc(a.name)}</b>: ${esc(m.text || '')}`, 'live'); }
+    return;
+  }
+  if (m.type === 'goto') {
+    if (!a && m.name) a = sim.ensureVisitor({ id: m.agentId || ('tmp-' + m.name), name: m.name, zone: m.text || m.zone });
+    if (a) sim.applyLiveGoto(a, m.text || m.zone);
+    return;
+  }
+  if (m.type === 'interaction') ui.feed(`<b>${esc(m.from)}</b> → <b>${esc(m.to)}</b> · ${esc(m.act || '')}`, 'live');
+  if (m.type === 'intent') ui.feed(`✅ <b>${esc(m.name || 'Tour Agent')}</b> · ${esc(m.text || '')}`, 'live');
+}
+function connectHttpBridge(url) {
+  const base = bridgeBase(url);
+  let since = Date.now() - 60e3;
+  let seen = new Set();
+  const tick = async () => {
+    try {
+      const r = await fetch(base + '/feed?since=' + since, { cache: 'no-store' });
+      if (!r.ok) throw new Error('feed ' + r.status);
+      const j = await r.json();
+      if (Array.isArray(j.agents)) sim.syncVisitors(j.agents);
+      for (const m of j.messages || []) {
+        if (seen.has(m.id)) continue;
+        seen.add(m.id);
+        if (seen.size > 500) seen = new Set([...seen].slice(-200));
+        applyBridgeMessage(m);
+        if (m.ts && m.ts > since) since = m.ts;
+      }
+      if (j.serverTime) { /* keep */ }
+      const el = $('#simtxt');
+      if (el && !el.textContent.includes('agent bridge')) el.textContent = 'Live Tour Agent bridge · ' + (j.agents?.length || 0) + ' joined';
+    } catch (e) {
+      console.warn('bridge poll', e);
+      const el = $('#simtxt'); if (el) el.textContent = 'Bridge reconnecting · simulated ambient';
+    }
+  };
+  $('#simtxt') && ($('#simtxt').textContent = 'Connecting to Tour Agent bridge…');
+  ui.feed('🔌 <b>Tour Agent bridge</b> on — live avatars will appear when agents join', 'live');
+  tick();
+  setInterval(tick, 2500);
+}
+function connectWsBridge(url) {
   let ws; try { ws = new WebSocket(url); } catch (e) { ui.toast('⚠️', 'Bridge URL rejected', String(e.message || e)); return; }
   ws.onopen = () => { $('#simtxt').textContent = 'Connected to the agent bridge'; ui.feed('🔌 <b>Connected to the agent bridge</b>, showing real activity', 'live'); };
-  ws.onmessage = ev => {
-    let m; try { m = JSON.parse(ev.data); } catch { return; }
-    const a = sim.get(m.agent) || [...sim.agents.values()].find(x => x.name === m.agent);
-    if (m.type === 'say' && a) { a.say(String(m.text).slice(0, 200), 4); ui.feed(`<b>${esc(a.name)}</b>: ${esc(m.text)}`, 'live'); }
-    if (m.type === 'goto' && a && ZONES.find(z => z.id === m.zone)) a.walkTo(ZONES.find(z => z.id === m.zone).yard, 'Live: heading to ' + m.zone);
-    if (m.type === 'interaction') ui.feed(`<b>${esc(m.from)}</b> → <b>${esc(m.to)}</b> · ${esc(m.act || '')}`, 'live');
-  };
-  ws.onclose = () => { $('#simtxt').textContent = 'Bridge disconnected · simulated'; setTimeout(() => connectBridge(url), 8000); };
+  ws.onmessage = ev => { let m; try { m = JSON.parse(ev.data); } catch { return; } applyBridgeMessage(m); };
+  ws.onclose = () => { $('#simtxt').textContent = 'Bridge disconnected · simulated'; setTimeout(() => connectWsBridge(url), 8000); };
+}
+function connectBridge(url) {
+  if (!url) return;
+  if (/^wss?:/i.test(url)) return connectWsBridge(url);
+  return connectHttpBridge(url);
 }
 if (CFG.bridge) connectBridge(CFG.bridge);
 
