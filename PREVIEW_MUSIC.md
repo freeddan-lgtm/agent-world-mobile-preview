@@ -1,31 +1,32 @@
-# Preview music (GitHub Pages only)
+# Preview music (GitHub Pages only — no further production deploys)
 
-Full ~23:17 Phish 1998-07-01 Tweezer AUD for https://freeddan-lgtm.github.io/agent-world-mobile-preview/
+## Live preview (tested)
 
-## How audio lands on Pages
+**URL:** https://freeddan-lgtm.github.io/agent-world/mobile-preview/
 
-GitHub Contents API / MCP rejects binary and large single files. Pipeline:
+- Track: Phish 1998-07-01 · Tweezer AUD ~23:17 (96 kbps stereo, 4 parts)
+- Playlist: jsDelivr → `freeddan-lgtm/agent-world-mobile-preview@main/music/ph98-07-01d201-p{1–4}.mp3` (materialized by Actions from chunked `.mp3.b64.*`)
+- QA (2026-11-01 ~01:06 America/Chicago): Tap for music → plays; near-end of p1 advances to p2; UI shows 23:17; viewport 390×844. See `qa/pages-preview-music-qa.json`.
 
-1. Encode each 96 kbps MP3 part as base64 ASCII.
-2. Split each `.mp3.b64` into ~1.4 MB chunks: `music/ph98-07-01d201-p{N}.mp3.b64.{01..}`
-3. Push chunks via `create_or_update_file` (one commit each).
-4. Workflow `.github/workflows/materialize-music.yml` concatenates sorted chunks, `base64 -d` → `music/ph98-07-01d201-p{N}.mp3`, commits the MP3s.
-5. Pages serves the MP3s with CORS `*` and `Accept-Ranges: bytes` (see `_headers` / Pages defaults).
+## Canonical project-Pages URL (blocked until Pages enabled)
 
-Playlist in `src/main.js`: `MUSIC_PARTS = [p1,p2,p3,p4]`, chained on `ended`. UI shows ~23:17. No autoplay — Tap for music.
+`https://freeddan-lgtm.github.io/agent-world-mobile-preview/` — repo `has_pages: false`. Workflow `.github/workflows/pages.yml` is ready (`enablement: true`) but Actions GITHUB_TOKEN gets **Resource not accessible by integration** when creating the Pages site.
 
-## Production gate (do not ship until Daniel says yes)
+**Who must unblock:** Daniel Freed (repo admin) — one click in  
+https://github.com/freeddan-lgtm/agent-world-mobile-preview/settings/pages  
+→ Build and deployment → Source: **GitHub Actions** (save).  
+Then re-run workflow `Deploy GitHub Pages preview` (or push any commit). After that, same-origin `/music/*.mp3` can replace jsDelivr on that host.
 
-Production URL `https://ce2-h7w3n9x5kq2m.vercel.app/` already has music from an earlier deploy (`dpl_9Fy1YC76igVuJAQKk5JbwPNCfL6Z`). **Chief steering: no further production publishes by any route** until Daniel explicitly approves.
+MP3s + chunked b64 + materialize workflow already on `main` (Actions run #3 succeeded).
 
-### Exact blocker for a *new* production publish
+## Production publish blocker (ce2-h7w3n9x5kq2m.vercel.app)
 
 | Item | Detail |
 |------|--------|
-| **Who must approve** | Daniel Freed (explicit "yes" / ship-to-prod). Chief of Staff gate — not SSO alone. |
-| **What approval means** | Permission to run a new Vercel deployment that changes live `ce2-h7w3n9x5kq2m.vercel.app`. |
-| **After approval** | Use `user-Vercel-xai` `create_deployment` **without** `teamId` (team-scoped calls → 403 SSO). Upload music parts via `upload_file` then deploy with file sha/size list. Alternative paths (git-push→Vercel, CLI, connector retries) are also blocked until the same Daniel yes. |
-| **Optional later** | Vercel team SSO consent would unlock `teamId`-scoped connector calls; not required for file deploy without teamId. |
-| **Not required for preview** | GH Pages preview does not need Vercel or Daniel prod approval. |
+| **Gate** | Chief steering (Nov 1): **no** production ship by any route until Daniel explicitly says yes. |
+| **Who approves** | Daniel Freed — explicit “yes / ship to prod” (not implied by preview work; not SSO alone). |
+| **What is blocked** | New Vercel deploy to `ce2-h7w3n9x5kq2m.vercel.app`: `user-Vercel-xai` `create_deployment`, `vercel deploy --prod`, git-push→Vercel, connector retries that deploy. |
+| **After Daniel says yes** | Use `user-Vercel-xai` **without** `teamId` (team-scoped → 403 SSO). Upload music via `upload_file`, then `create_deployment` with file sha/size list. Optional later: Vercel team SSO consent for `teamId` calls. |
+| **Already live (do not touch)** | Earlier music deploy `dpl_9Fy1YC76igVuJAQKk5JbwPNCfL6Z` remains; do not redeploy or change it until yes. |
 
-Do **not** git-push-trigger Vercel, run `vercel deploy --prod`, or retry deploy connectors until Daniel says yes.
+No public posts / spend / contacts from this workstream.
