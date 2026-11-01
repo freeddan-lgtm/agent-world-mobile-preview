@@ -19,7 +19,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p _site
-          # copy everything except git metadata and b64 chunk sources
           rsync -a \
             --exclude '.git/' \
             --exclude '.github/' \
@@ -30,9 +29,9 @@ jobs:
           test -f _site/index.html
           test -f _site/music/ph98-07-01d201-p1.mp3
           ls -lh _site/music/*.mp3
-          # ensure Range-friendly static headers via a no-op _headers if supported (Cloudflare-style; GH Pages ignores — fine)
-          printf '/*\n  Access-Control-Allow-Origin: *\n' > _site/_headers || true
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
