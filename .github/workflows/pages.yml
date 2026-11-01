@@ -1,0 +1,47 @@
+name: Deploy GitHub Pages preview
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage site (drop b64 sources; keep MP3s)
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          # copy everything except git metadata and b64 chunk sources
+          rsync -a \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '_site/' \
+            --exclude 'music/*.mp3.b64' \
+            --exclude 'music/*.mp3.b64.*' \
+            ./ _site/
+          test -f _site/index.html
+          test -f _site/music/ph98-07-01d201-p1.mp3
+          ls -lh _site/music/*.mp3
+          # ensure Range-friendly static headers via a no-op _headers if supported (Cloudflare-style; GH Pages ignores — fine)
+          printf '/*\n  Access-Control-Allow-Origin: *\n' > _site/_headers || true
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
