@@ -20,18 +20,18 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          for i in 1 2 3 4; do
-            chunks=(music/ph98-07-01d201-p${i}.mp3.b64.*)
-            if [ ${#chunks[@]} -eq 0 ] && [ -f music/ph98-07-01d201-p${i}.mp3.b64 ]; then
-              base64 -d "music/ph98-07-01d201-p${i}.mp3.b64" > "music/ph98-07-01d201-p${i}.mp3"
+          for i in 1 2 3 4 5 6 7; do
+            chunks=(music/tweezer-2001-p${i}.mp3.b64.*)
+            if [ ${#chunks[@]} -eq 0 ] && [ -f music/tweezer-2001-p${i}.mp3.b64 ]; then
+              base64 -d "music/tweezer-2001-p${i}.mp3.b64" > "music/tweezer-2001-p${i}.mp3"
             elif [ ${#chunks[@]} -gt 0 ]; then
               IFS=$'\n' sorted=($(printf '%s\n' "${chunks[@]}" | sort))
-              cat "${sorted[@]}" | base64 -d > "music/ph98-07-01d201-p${i}.mp3"
+              cat "${sorted[@]}" | base64 -d > "music/tweezer-2001-p${i}.mp3"
             else
               echo "No b64 for part $i"; continue
             fi
-            ls -lh "music/ph98-07-01d201-p${i}.mp3"
-            file "music/ph98-07-01d201-p${i}.mp3"
+            ls -lh "music/tweezer-2001-p${i}.mp3"
+            file "music/tweezer-2001-p${i}.mp3"
           done
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -40,8 +40,7 @@ jobs:
             echo "No MP3 changes"
             exit 0
           fi
-          git commit -m "Materialize Phish Tweezer AUD MP3 parts from chunked b64 for GitHub Pages"
-          # Retry push if main moved (e.g. docs commit during decode)
+          git commit -m "Materialize Phish 7/1/98 Tweezer>2001 MP3 parts from chunked b64"
           for attempt in 1 2 3 4 5; do
             if git push origin HEAD:main; then
               exit 0
