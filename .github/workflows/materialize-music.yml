@@ -2,6 +2,7 @@ name: Materialize music MP3s
 on:
   push:
     paths:
+      - 'music/*.mp3.b64.*'
       - 'music/*.mp3.b64'
       - '.github/workflows/materialize-music.yml'
   workflow_dispatch:
@@ -12,16 +13,22 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Decode base64 parts to MP3
+      - name: Concat base64 chunks and decode to MP3
         run: |
           set -euo pipefail
           shopt -s nullglob
-          for f in music/*.mp3.b64; do
-            out="${f%.b64}"
-            echo "Decoding $f -> $out"
-            base64 -d "$f" > "$out"
-            ls -lh "$out"
-            file "$out"
+          for i in 1 2 3 4; do
+            chunks=(music/ph98-07-01d201-p${i}.mp3.b64.*)
+            if [ ${#chunks[@]} -eq 0 ] && [ -f music/ph98-07-01d201-p${i}.mp3.b64 ]; then
+              cat "music/ph98-07-01d201-p${i}.mp3.b64" | base64 -d > "music/ph98-07-01d201-p${i}.mp3"
+            elif [ ${#chunks[@]} -gt 0 ]; then
+              IFS=$'\n' sorted=($(printf '%s\n' "${chunks[@]}" | sort))
+              cat "${sorted[@]}" | base64 -d > "music/ph98-07-01d201-p${i}.mp3"
+            else
+              echo "No b64 for part $i"; continue
+            fi
+            ls -lh "music/ph98-07-01d201-p${i}.mp3"
+            file "music/ph98-07-01d201-p${i}.mp3"
           done
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -30,5 +37,5 @@ jobs:
             echo "No MP3 changes"
             exit 0
           fi
-          git commit -m "Materialize Phish Tweezer AUD MP3 parts from b64 for GitHub Pages"
+          git commit -m "Materialize Phish Tweezer AUD MP3 parts from chunked b64 for GitHub Pages"
           git push
