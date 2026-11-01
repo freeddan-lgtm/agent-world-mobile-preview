@@ -1,0 +1,34 @@
+name: Materialize music MP3s
+on:
+  push:
+    paths:
+      - 'music/*.mp3.b64'
+      - '.github/workflows/materialize-music.yml'
+  workflow_dispatch:
+jobs:
+  decode:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decode base64 parts to MP3
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for f in music/*.mp3.b64; do
+            out="${f%.b64}"
+            echo "Decoding $f -> $out"
+            base64 -d "$f" > "$out"
+            ls -lh "$out"
+            file "$out"
+          done
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add music/*.mp3 || true
+          if git diff --cached --quiet; then
+            echo "No MP3 changes"
+            exit 0
+          fi
+          git commit -m "Materialize Phish Tweezer AUD MP3 parts from b64 for GitHub Pages"
+          git push
